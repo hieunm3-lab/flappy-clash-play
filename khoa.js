@@ -71,18 +71,25 @@ function lockUI(why){document.title="Flappy Clash";
   document.body.ondragover=e=>{e.preventDefault();d.classList.add("on")};document.body.ondragleave=()=>d.classList.remove("on");
   document.body.ondrop=e=>{e.preventDefault();d.classList.remove("on");use(e.dataTransfer.files[0])}}
 function menuUI(){$("#fcbox").innerHTML=`<h1>🐤 Flappy Clash</h1><p>Chọn bản để chơi. Bấm Back của trình duyệt để quay lại đây.</p>`+
-  BANS.map(b=>`<a class="b" href="?ban=${b.id}" data-id="${b.id}"><b>${b.ten}</b><span>${b.mota}</span><i>Build ${b.ngay} · ${b.mb} MB</i></a>`).join("")+
+  BANS.map(b=>`<a class="b" href="?ban=${b.id}" data-id="${b.id}"><b>${b.ten}</b><span>${b.mota}</span><i>Build ${b.ngay} · ${b.mb} MB${b.phu?" ("+(b.phu.length+1)+" file)":""}</i></a>`).join("")+
   `<div id="fcmsg"></div><p class="q"><a href="?quenkhoa">Quên khoá trên trình duyệt này</a></p>`;
   document.querySelectorAll("#fcbox a.b").forEach(a=>a.onclick=e=>{e.preventDefault();history.pushState(null,"","?ban="+a.dataset.id);route()})}
+// HD_LL_1511: bản có file phụ (b.phu = [{p: đường dẫn trong html, bin}]) → giải từng file thành blob URL, thay đường dẫn trong html
+let phuU=[];
 async function play(b){$("#fcbox").innerHTML=`<h1>🐤 ${b.ten}</h1><p>Đang tải bản chơi (${b.mb} MB)…</p><div class="bar"><div></div></div><div id="fcmsg"></div>`;
-  try{const buf=await get(b.bin,p=>{const e=$("#fcbox .bar div");if(e)e.style.width=(p*100).toFixed(0)+"%"});
-    msg("⏳ Đang giải mã…",1);const html=await open(KEY,buf);
+  const ph=b.phu||[],N=ph.length+1,bar=(j,p)=>{const e=$("#fcbox .bar div");if(e)e.style.width=((j+p)/N*100).toFixed(0)+"%"};
+  try{const buf=await get(b.bin,p=>bar(0,p));
+    msg("⏳ Đang giải mã…",1);let html=await open(KEY,buf);
+    if(ph.length){let t=await html.text();
+      for(let j=0;j<ph.length;j++){msg("⏳ Đang tải ảnh HD "+(j+1)+"/"+ph.length+"…",1);const js=await open(KEY,await get(ph[j].bin,p=>bar(j+1,p)));
+        const u=URL.createObjectURL(new Blob([js],{type:"text/javascript"}));phuU.push(u);t=t.split(ph[j].p).join(u)}
+      html=new Blob([t],{type:"text/html"})}
     if(new URLSearchParams(location.search).get("ban")!==b.id)return;
     url=URL.createObjectURL(new Blob([html],{type:"text/html"}));frame=document.createElement("iframe");frame.id="fcgame";
     frame.allow="autoplay; fullscreen; gamepad";frame.src=url;frame.onload=()=>frame.contentWindow.focus();
     document.body.appendChild(frame);$("#fcwrap").hidden=true;document.title="Flappy Clash — "+b.ten}
   catch(e){msg("❌ "+e.message)}}
-function route(){if(frame){frame.remove();frame=null;URL.revokeObjectURL(url);url=null}$("#fcwrap").hidden=false;document.title="Flappy Clash";
+function route(){if(frame){frame.remove();frame=null;URL.revokeObjectURL(url);url=null}phuU.forEach(u=>URL.revokeObjectURL(u));phuU=[];$("#fcwrap").hidden=false;document.title="Flappy Clash";
   document.body.ondragover=document.body.ondrop=document.body.ondragleave=null;
   if(!KEY)return lockUI();const id=new URLSearchParams(location.search).get("ban");let b=BANS.find(x=>x.id===id);
   if(!b&&BANS.length===1){b=BANS[0];history.replaceState(null,"","?ban="+b.id)}b?play(b):menuUI()}
